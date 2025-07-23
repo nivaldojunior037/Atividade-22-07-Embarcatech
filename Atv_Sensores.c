@@ -36,7 +36,7 @@
 #define HUM_MIN 40.0
 #define HUM_MAX 70.0
 #define PRESS_MIN 90.0
-#define PRESS_MAX 1020.0
+#define PRESS_MAX 102.0
 
 // Definição de variáveis globais e flags utilizadas
 static volatile PIO pio = pio0;
@@ -54,11 +54,11 @@ volatile float humi_min = 40.0;
 volatile float humi_max = 60.0;
 volatile float temp_min = 22.0;
 volatile float temp_max = 28.0;
-volatile float press_min = 1005.0;
-volatile float press_max = 1020.0;
-int32_t pressure;
+volatile float press_min = 90.0;
+volatile float press_max = 102.0;
+int32_t pressure = 0;
 double altitude;
-int32_t temperature; 
+int32_t temperature = 0; 
 AHT20_Data data;
 int32_t raw_temp_bmp;
 int32_t raw_pressure;
@@ -145,10 +145,9 @@ void inicializar_perif(){
     gpio_pull_up(I2C_SCL);
 
     // Determinação de variáveis necessárias para funcionamento da matriz de LEDs
-    PIO pio = pio0;
-    uint offset = pio_add_program(pio, &leds_matrix_program);
-    uint sm = pio_claim_unused_sm(pio, true);
-    uint32_t valor_led;
+    pio = pio0; 
+    offset = pio_add_program(pio, &leds_matrix_program);
+    sm = pio_claim_unused_sm(pio, true);
     leds_matrix_program_init(pio, sm, offset, LEDS_PIN);
 
     gpio_init(LED_VERDE);
@@ -175,64 +174,28 @@ void inicializar_perif(){
 
 //Esqueleto do html usado
 const char HTML_BODY[] =
-"<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Estação Meteorológica</title>"
-"<style>"
-"body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background-color: #f9f9f9; }"
-"h1 { color: #005f99; }"
-"p { font-size: 16px; margin: 10px 0; }"
-"input, button { font-size: 14px; margin: 5px; padding: 6px 10px; }"
-"</style>"
+"<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Estação</title>"
+"<style>body{font-family:Arial;text-align:center;padding:20px;background:#f9f9f9}h1{color:#05f}p,input,button{font-size:14px;margin:5px}</style>"
 "<script>"
-"function atualizar() {"
-"  fetch('/clima')"
-"    .then(res => res.json())"
-"    .then(data => {"
-"      document.getElementById('sensor-type').innerText = data.sensor === 0 ? 'BMP280' : 'AHT20';"
-"      if(data.sensor == 0){"
-"       document.getElementById('umidade').innerText = data.umidade.toFixed(2) + ' %% ';"
-"       document.getElementById('tempAHT').innerText = data.tempAHT.toFixed(2) + ' °C ';"
-"       document.getElementById('aht-container').style.display = 'block';"
-"       document.getElementById('bmp-container').style.display = 'none';"
-"       } else {"
-"       document.getElementById('pressao').innerText = data.pressao.toFixed(2) + ' kPa ';"
-"       document.getElementById('tempBMP').innerText = data.tempBMP.toFixed(2) + ' °C ';"
-"       document.getElementById('aht-container').style.display = 'none';"
-"       document.getElementById('bmp-container').style.display = 'block';"     
-"}"
-"}"
-"}"");"
-"}"
-"setInterval(atualizar, 1000);"
+"function up(){fetch('/clima').then(r=>r.json()).then(d=>{"
+"g('s').innerText=d.sensor==0?'AHT20':'BMP280';"
+"if(d.sensor==0){g('u').innerText=d.umidade.toFixed(1)+'%%';g('tA').innerText=d.tempAHT.toFixed(1)+'°C';h('a',1);h('b',0);}"
+"else{g('p').innerText=d.pressao.toFixed(1)+'kPa';g('tB').innerText=d.tempBMP.toFixed(1)+'°C';h('a',0);h('b',1);}})}"
+"function g(id){return document.getElementById(id)}"
+"function h(id,on){g(id).style.display=on?'block':'none'}"
+"function s(e,t,m=1){let v=parseFloat(g(e).value);fetch('/'+t+'/'+Math.round(v*m));}"
+"setInterval(up,1000);"
 "</script></head><body>"
-"<h1>Estação Meteorológica</h1>"
-"<p>Sensor ativo: <strong id='sensor-type'>---</strong></p>"
-"<div id='aht-container' style='display:none'>"
-"<p>Temperatura (AHT20): <strong id='tempAHT'>---</strong></p>"
-"<p>Umidade: <strong id='umidade'>---</strong></p>"
-"</div>"
-"<div id='bmp-container' style='display:none'>"
-"<p>Temperatura (BMP280): <strong id='tempBMP'>---</strong></p>"
-"<p>Pressão: <strong id='pressao'>---</strong></p>"
-"</div>"
-"<hr>"
-"<p>Definir limite mínimo de temperatura AHT (22°C a 25°C):</p>"
-"<input type='number' id='minimoInput'><button onclick='enviarMin()'>Atualizar Mínimo</button>"
-"<p>Definir limite máximo de temperatura AHT(26°C a 28°C):</p>"
-"<input type='number' id='maximoInput'><button onclick='enviarMax()'>Atualizar Máximo</button>"
-"<p>Definir limite mínimo de umidade (40% a 50%):</p>"
-"<input type='number' id='minimoInput'><button onclick='enviarMin()'>Atualizar Mínimo</button>"
-"<p>Definir limite máximo de umidade (60% a 70%):</p>"
-"<input type='number' id='maximoInput'><button onclick='enviarMax()'>Atualizar Máximo</button>"
-"<script>"
-"function enviarMin() {"
-"  var val = document.getElementById('minimoInput').value;"
-"  fetch('/minimun/' + val);"
-"}"
-"function enviarMax() {"
-"  var val = document.getElementById('maximoInput').value;"
-"  fetch('/maximun/' + val);"
-"}"
-"</script></body></html>";
+"<h1>Estação Meteorológica</h1><p>Sensor: <strong id='s'>---</strong></p>"
+"<div id='a' style='display:none'><p>Temp AHT: <strong id='tA'>---</strong></p><p>Umid: <strong id='u'>---</strong></p></div>"
+"<div id='b' style='display:none'><p>Temp BMP: <strong id='tB'>---</strong></p><p>Press: <strong id='p'>---</strong></p></div><hr>"
+"<p>Temp AHT min (22-25):</p><input id='i1' type='number'><button onclick=\"s('i1','minimun/temp',100)\">Atualizar</button>"
+"<p>Temp AHT max (26-28):</p><input id='i2' type='number'><button onclick=\"s('i2','maximun/temp',100)\">Atualizar</button>"
+"<p>Umid min (40-50):</p><input id='i3' type='number'><button onclick=\"s('i3','minimun/umidade')\">Atualizar</button>"
+"<p>Umid max (60-70):</p><input id='i4' type='number'><button onclick=\"s('i4','maximun/umidade')\">Atualizar</button>"
+"<p>Press min (90-100):</p><input id='i5' type='number'><button onclick=\"s('i5','minimun/pressao')\">Atualizar</button>"
+"<p>Press max (110-120):</p><input id='i6' type='number'><button onclick=\"s('i6','maximun/pressao')\">Atualizar</button>"
+"</body></html>";
 
 struct http_state
 {
@@ -288,7 +251,7 @@ static err_t http_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t er
                            "\r\n"
                            "%s",
                            (int)strlen(msg), msg);
-    }
+        }
         else if (strstr(req, "GET /maximun/temp/"))
         {
             int valor = atoi(strstr(req, "/maximun/temp/") + strlen("/maximun/temp/"));
@@ -296,8 +259,6 @@ static err_t http_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t er
             if (novo_max >= 26.0f && novo_max <= 28.0f) {
                 temp_max = novo_max; 
             }
-
-
 
         const char *msg = "Temp. máxima atualizada";
         hs->len = snprintf(hs->response, sizeof(hs->response),
@@ -308,8 +269,8 @@ static err_t http_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t er
                            "\r\n"
                            "%s",
                            (int)strlen(msg), msg);
-    }
-        if (strstr(req, "GET /minimun/umidade/"))
+        }
+        else if (strstr(req, "GET /minimun/umidade/"))
         {
             int valor = atoi(strstr(req, "/minimun/umidade/") + strlen("/minimun/umidade/"));
             float novo_min = (float)valor;
@@ -392,9 +353,9 @@ else if (strstr(req, "GET /clima"))
                                 "\"tempAHT\":%.2f,"
                                 "\"umidade\":%.2f,"
                                 "\"tempBMP\":%.2f,"
-                                "\"pressao\":%.2f,"
+                                "\"pressao\":%.2f"
                             "}",
-                            bmp280_ativo, data.temperature, data.humidity, temperature, pressure);
+                            bmp280_ativo, data.temperature, data.humidity, temperature / 100.0f, pressure / 1000.0f);
 
     printf("[DEBUG] JSON: %s\n", json_payload);
 
@@ -470,10 +431,10 @@ int main() {
     aht20_reset(I2C_PORT);
     aht20_init(I2C_PORT);
 
-    char str_tmp1[5];  // Buffer para armazenar a string
+    char str_tmp1[5];   // Buffer para armazenar a string
     char str_press[5];  // Buffer para armazenar a string  
-    char str_tmp2[5];  // Buffer para armazenar a string
-    char str_umi[5];  // Buffer para armazenar a string     
+    char str_tmp2[5];   // Buffer para armazenar a string
+    char str_umi[5];    // Buffer para armazenar a string     
     
     // Inicializa a arquitetura do cyw43
     while (cyw43_arch_init())
@@ -512,7 +473,7 @@ int main() {
         bmp280_read_raw(I2C_PORT, &raw_temp_bmp, &raw_pressure);
         temperature = bmp280_convert_temp(raw_temp_bmp, &params);
         // Leitura do BMP280
-        if(temperature > 1000){
+        if(temperature > 100){
             pressure = bmp280_convert_pressure(raw_pressure, raw_temp_bmp, &params);
             altitude = calculate_altitude(pressure);
             bmp280_ativo = true;
@@ -531,39 +492,39 @@ int main() {
 
         // Transformação dos inteiros em strings para o display
         sprintf(str_tmp1, "%.1fC", temperature / 100.0);  // Converte o inteiro em string
-        sprintf(str_press, "%.1fkPa", pressure);  // Converte o inteiro em string
-        sprintf(str_tmp2, "%.1fC", data.temperature);  // Converte o inteiro em string
-        sprintf(str_umi, "%.1f%%", data.humidity);  // Converte o inteiro em string        
+        sprintf(str_press, "%.0fkPa", pressure/1000.0);          // Converte o inteiro em string
+        sprintf(str_tmp2, "%.1fC", data.temperature);     // Converte o inteiro em string
+        sprintf(str_umi, "%.1f%%", data.humidity);        // Converte o inteiro em string        
     
         //Acionamento de periféricos em caso do BMP280 estar sendo usado
         if(bmp280_ativo){
-            if(pressure > press_max || temperature > temp_max){
+            if(pressure/1000.0 > press_max || temperature/100.0 > temp_max){
                 desenhos(desenho1, valor_led, pio, sm, 0.0, 0.5, 0.0);
-                tocar_buzzer(3000, 1.0);
-                gpio_put(LED_VERDE, 0);
-                gpio_put(LED_VERMELHO, 1);
-            } 
-            else if(pressure > press_max-2.0 || temperature > temp_max-0.8){
-                desenhos(desenho2, valor_led, pio, sm, 0.0, 0.5, 0.0);
-                tocar_buzzer(1500, 0.5);
-                gpio_put(LED_VERDE, 1);
-                gpio_put(LED_VERMELHO, 1);
-            } 
-            else if(pressure < press_min+2.0 || temperature < temp_min+0.8){
-                desenhos(desenho2, valor_led, pio, sm, 0.0, 0.5, 0.0);
-                tocar_buzzer(1500, 0.5);
-                gpio_put(LED_VERDE, 1);
-                gpio_put(LED_VERMELHO, 1);
-            } 
-            else if(pressure < press_min || temperature < temp_min){
-                desenhos(desenho1, valor_led, pio, sm, 0.0, 0.5, 0.0);
-                tocar_buzzer(3000, 1.0);
+                tocar_buzzer(2000, 1000);
                 gpio_put(LED_VERDE, 0);
                 gpio_put(LED_VERMELHO, 1);
             }
+            else if(pressure/1000.0 < press_min || temperature/100.0 < temp_min){
+                desenhos(desenho1, valor_led, pio, sm, 0.0, 0.5, 0.0);
+                tocar_buzzer(2000, 1000);
+                gpio_put(LED_VERDE, 0);
+                gpio_put(LED_VERMELHO, 1);
+            } 
+            else if(pressure/1000.0 > press_max-2.0 || temperature/100.0 > temp_max-0.8){
+                desenhos(desenho2, valor_led, pio, sm, 0.0, 0.5, 0.5);
+                tocar_buzzer(1000, 500);
+                gpio_put(LED_VERDE, 1);
+                gpio_put(LED_VERMELHO, 1);
+            } 
+            else if(pressure/1000.0 < press_min+2.0 || temperature/100.0 < temp_min+0.8){
+                desenhos(desenho2, valor_led, pio, sm, 0.0, 0.5, 0.5);
+                tocar_buzzer(1000, 500);
+                gpio_put(LED_VERDE, 1);
+                gpio_put(LED_VERMELHO, 1);
+            } 
             else { 
                 desenhos(desenho3, valor_led, pio, sm, 0.0, 0.0, 0.5);
-                tocar_buzzer(1000, 0.2);
+                tocar_buzzer(500, 200);
                 gpio_put(LED_VERDE, 1);
                 gpio_put(LED_VERMELHO, 0);
         }
@@ -574,10 +535,10 @@ int main() {
             ssd1306_draw_string(&ssd, "Sensor BMP280", 12, 8);  // Desenha uma string
             ssd1306_draw_string(&ssd, "Wi-Fi ativo", 20, 20);   // Desenha uma string
             ssd1306_line(&ssd, 63, 33, 63, 60, cor);            // Desenha uma linha vertical
-            ssd1306_draw_string(&ssd, "Temp", 18, 36);  // Desenha uma string
-            ssd1306_draw_string(&ssd, "Press", 74, 36);  // Desenha uma string
-            ssd1306_draw_string(&ssd, str_tmp1, 14, 46);         // Desenha uma string
-            ssd1306_draw_string(&ssd, str_press, 74, 46);         // Desenha uma string
+            ssd1306_draw_string(&ssd, "Temp", 18, 36);          // Desenha uma string
+            ssd1306_draw_string(&ssd, "Press", 74, 36);         // Desenha uma string
+            ssd1306_draw_string(&ssd, str_tmp1, 14, 46);        // Desenha uma string
+            ssd1306_draw_string(&ssd, str_press, 74, 46);       // Desenha uma string
             ssd1306_send_data(&ssd);                            // Atualiza o display
         } 
         
@@ -585,31 +546,31 @@ int main() {
         else if (!bmp280_ativo){
             if(data.temperature > temp_max || data.humidity > humi_max){
                 desenhos(desenho1, valor_led, pio, sm, 0.0, 0.5, 0.0);
-                tocar_buzzer(3000, 1.0);
+                tocar_buzzer(2000, 1000);
                 gpio_put(LED_VERDE, 0);
                 gpio_put(LED_VERMELHO, 1);
-            } 
+            }  
+            else if(data.temperature < temp_min || data.humidity < humi_min){
+                desenhos(desenho1, valor_led, pio, sm, 0.0, 0.5, 0.0);
+                tocar_buzzer(2000, 1000);
+                gpio_put(LED_VERDE, 0);
+                gpio_put(LED_VERMELHO, 1);
+            }
             else if(data.temperature > temp_max-0.8 || data.humidity > humi_max-5.0){
                 desenhos(desenho2, valor_led, pio, sm, 0.0, 0.5, 0.5);
-                tocar_buzzer(1500, 0.5);
+                tocar_buzzer(1000, 500);
                 gpio_put(LED_VERDE, 1);
                 gpio_put(LED_VERMELHO, 1);
             } 
             else if(data.temperature < temp_min+0.8 || data.humidity < humi_min+5.0){
                 desenhos(desenho2, valor_led, pio, sm, 0.0, 0.5, 0.5);
-                tocar_buzzer(1500, 0.5);
+                tocar_buzzer(1000, 500);
                 gpio_put(LED_VERDE, 1);
-                gpio_put(LED_VERMELHO, 1);
-            } 
-            else if(data.temperature < temp_min || data.humidity < humi_min){
-                desenhos(desenho1, valor_led, pio, sm, 0.0, 0.5, 0.0);
-                tocar_buzzer(3000, 1.0);
-                gpio_put(LED_VERDE, 0);
                 gpio_put(LED_VERMELHO, 1);
             }
             else { 
                 desenhos(desenho3, valor_led, pio, sm, 0.0, 0.0, 0.5);
-                tocar_buzzer(1000, 0.2);
+                tocar_buzzer(500, 200);
                 gpio_put(LED_VERDE, 1);
                 gpio_put(LED_VERMELHO, 0);
             }
@@ -617,12 +578,12 @@ int main() {
             ssd1306_fill(&ssd, !cor);                           // Limpa o display
             ssd1306_rect(&ssd, 3, 3, 122, 60, cor, !cor);       // Desenha um retângulo
             ssd1306_line(&ssd, 3, 32, 123, 32, cor);            // Desenha uma linha
-            ssd1306_draw_string(&ssd, "Sensor AHT20", 16, 8);  // Desenha uma string
+            ssd1306_draw_string(&ssd, "Sensor AHT20", 16, 8);   // Desenha uma string
             ssd1306_draw_string(&ssd, "Wi-Fi ativo", 20, 20);   // Desenha uma string
             ssd1306_line(&ssd, 63, 33, 63, 60, cor);            // Desenha uma linha vertical
-            ssd1306_draw_string(&ssd, "Temp", 18, 36);  // Desenha uma string
-            ssd1306_draw_string(&ssd, "Umid", 78, 36);  // Desenha uma string
-            ssd1306_draw_string(&ssd, str_tmp2, 14, 46);         // Desenha uma string
+            ssd1306_draw_string(&ssd, "Temp", 18, 36);          // Desenha uma string
+            ssd1306_draw_string(&ssd, "Umid", 78, 36);          // Desenha uma string
+            ssd1306_draw_string(&ssd, str_tmp2, 14, 46);        // Desenha uma string
             ssd1306_draw_string(&ssd, str_umi, 74, 46);         // Desenha uma string
             ssd1306_send_data(&ssd);  
         }
